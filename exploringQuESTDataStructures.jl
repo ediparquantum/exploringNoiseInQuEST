@@ -8,87 +8,59 @@ using DataFramesMeta
 using Chain
 using CairoMakie
 using BenchmarkTools
+using Formatting
 attributes = Theme(fontsize = 25,resolution=(800,800),Axis = (; aspect = 1),Legend = (;framevisible=false))
 set_theme!(attributes)
 
 
-state_vector_path = "data/density_matrix.csv"
-h_state_vector_path = "data/density_matrix1.csv"
-sv_df = CSV.read(state_vector_path,DataFrame,header=true)
-h_sv_df = CSV.read(h_state_vector_path,DataFrame,header=true)
+// # Memory needed
+    """
+        Plot to show how much memory is needed in simulating qubits
+    """
+    num_qubits = 1:40
+    bits_per_float=64
+    gb = total_gq_needed_N_qubits(num_qubits,bits_per_float)
+    f=Figure()
+    ax=Axis(f[1,1],xlabel="Number of Qubits",ylabel="Gigabytes")
+    scatter!(ax,qub,gb,markersize=10,label="GB to simulate")
+    axislegend()
+    f
+    save("figs/memory_simulate_qubits.png",f)
+
+//
+
+
+"""
+    Test X gate density matrix probabilities
+"""
+# Simulated in QuEST
+x_gate = "data/single_qubit-X.csv"
+amp_mat = load_amp_vector_density_mat(x_gate)
+prob_vec = get_prob_vec(amp_mat)
+
+# Simulated in Julia
+ρ = Complex.([1,0])*transpose(Complex.([1,0]))
+X = [0 1;1 0]
+ρ̂ = update_ρ(ρ,X)
+prob_vec = get_prob_vec(ρ̂)
 
 
 
-function convert_double_vec_complexDLM(path)
-vec = @chain path begin
-    readdlm(_,',') 
-    _[2:end,:]
-    Float64.(_)
-    [Complex(i[1],i[2]) for i in eachrow(_)]
+"""
+    Test X gate density matrix probabilities with damping
+"""
+# Simulated in QuEST
+x_gate_damping = "data/single_qubit-X_mix_damping_prob-0.1.csv"
+prob = 0.1
+amp_mat_damping = load_amp_vector_density_mat(x_gate_damping)
+prob_vec_damping = get_prob_vec(amp_mat_damping)
+
+
+# Simulated in Julia
+ρ = Complex.([1,0])*transpose(Complex.([1,0]))
+X = [0 1;1 0]
+ρ̂ = @chain ρ begin
+    update_ρ(_,X)
+    apply_mix_damping(_,prob)
 end
-return vec
-end
-
-function convert_double_vec_complexDLMReinterpret(path)
-    vec = @chain path begin
-        readdlm(_,',') 
-        _[2:end,:]
-        Float64.(_)
-        reinterpret(ComplexF64, _)
-    end
-    return vec
-    end
-    
-    function convert_double_vec_complexDLMReinterpretNoChain(path)
-        vec = readdlm(path,',')[2:end,:]
-        vec = Float64.(vec)
-        vec = reinterpret(ComplexF64, vec)
-        
-        return vec
-    end
-
-
-function convert_double_vec_complexCSV(path)
-    df = @chain path begin
-        CSV.read(_,DataFrame,header=true)
-        @rename begin
-            :imag = $2
-        end 
-        @rtransform :amp = Complex(:real,:imag) 
-        @select :amp
-    end
-    return df.amp 
-end
-
-function reshape_into_density_matrix(amp_vec)
-    dims = size(amp_vec,1) |> sqrt |> Int
-    return reshape(amp_vec,dims,dims)'
-end
-
-function load_amp_vector_density_mat(path)
-    return (reshape_into_density_matrix ∘ 
-        convert_double_vec_complexCSV)(path)
-end
-
-function get_prob_per_qubit(amp_mat)
-    amp_probs = abs2.(amp_mat) |> normalize |> diag 
-    @assert sum(amp_probs) == 1 "Total probability is not 1. Fixe"
-    return amp_probs
-end
-
-
-
-amp_mat = load_amp_vector_density_mat(state_vector_path)
-qub_probs = get_prob_per_qubit(amp_mat)
-
-
-memGBqub(qub)=(256/(8e9))*(2^qub)
-
-qub = 1:40
-gb = memGBqub.(qub)
-f=Figure()
-ax=Axis(f[1,1],xlabel="Number of Qubits",ylabel="Gigabytes")
-scatter!(ax,qub,gb,markersize=10,label="GB to simulate")
-axislegend()
-f
-save("figs/memory_simulate_qubits.png",f)
+prob_vec = get_prob_vec(ρ̂)
