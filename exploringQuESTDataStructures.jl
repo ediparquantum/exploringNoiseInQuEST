@@ -9,6 +9,8 @@ using Chain
 using CairoMakie
 using BenchmarkTools
 using Formatting
+using Distributions
+using Random
 attributes = Theme(fontsize = 25,resolution=(800,800),Axis = (; aspect = 1),Legend = (;framevisible=false))
 set_theme!(attributes)
 
@@ -81,3 +83,6 @@ prob_vec_damping_sim = get_prob_vec(ρ̂)
     @transform :JuliaQuEST = prob_vec_damping
     @transform :Julia = prob_vec_damping_sim
 end
+
+
+

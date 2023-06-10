@@ -74,3 +74,17 @@ function apply_mix_damping(ρ,prob)
     ρ_updated =  update_ρ(ρ,kraus[:K₀]) .+ update_ρ(ρ,kraus[:K₁])
     return ρ_updated
 end
+
+
+
+
+function enumerate_qubit_label_arrangement(N::Int)
+    [bitstring((i))[end-N+1:end] for i ∈ 0:2^N-1]
+end
+
+
+function list_qubit_axis_arrangement(N::Int)
+    arr = enumerate_qubit_label_arrangement(N)
+    pattern = ["|"*i*"⟩" for i in arr]
+    return pattern
+end
