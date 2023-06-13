@@ -18,6 +18,7 @@ set_theme!(attributes)
 
 include("functions.jl")
 
+
 data_path = string(homedir(),"/Projects/exploringNoiseInQuEST/data")
 fig_path = string(homedir(),"/Projects/exploringNoiseInQuEST/figs")
 

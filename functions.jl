@@ -88,3 +88,82 @@ function list_qubit_axis_arrangement(N::Int)
     pattern = ["|"*i*"⟩" for i in arr]
     return pattern
 end
+
+
+function get_noise_prob(text)
+    pattern = r"\d+(\.\d+)?"
+    m = match(pattern, text)
+    if isnothing(m)
+        return "No noise"
+    else
+        return m.match
+    end
+end
+
+
+
+"""
+    FROM CHAT GPT - CHECK EXAMPLES WORK
+    plot_probability_barplot(x_axis, probs, enum_comp_basis, noise_prob, basename)
+
+Constructs a bar plot of circuit probabilities.
+
+# Arguments
+- `x_axis::Vector`: x-axis values for the bar plot.
+- `probs::Vector`: probability values corresponding to the x-axis values.
+- `enum_comp_basis::Vector`: labels for the x-axis ticks.
+- `noise_prob::Float64`: noise probability used in the circuit.
+- `basename::String`: name of the circuit.
+
+# Returns
+- `f::Figure`: the resulting plot.
+
+# Details
+- The function constructs a bar plot of circuit probabilities using the given input data.
+- The `basename` is used to determine the legend label and gate name for the plot.
+- If `basename` contains the string "damping", the legend label will include the noise probability.
+- The function extracts the gate name from the `basename` using regular expression matching.
+- If no match is found for "PauliX" or "HGate" in the `basename`, an empty string is used as the gate name.
+
+# Example
+```julia
+x_axis = [1, 2, 3]
+probs = [0.3, 0.4, 0.6]
+enum_comp_basis = ["A", "B", "C"]
+noise_prob = 0.1
+basename = "prob-0.10.csv"
+
+plot_probability_barplot(x_axis, probs, enum_comp_basis, noise_prob, basename)
+"""
+function plot_probability_barplot(x_axis,probs,enum_comp_basis,noise_prob,basename)
+    
+    if contains(basename,r"damping")
+        leg_lab = "Circuit probabilities\nDamping, p=$(noise_prob)"
+    else
+        leg_lab = "Circuit probabilities"
+    end
+
+    mat = match(r"PauliX|HGate|HCZGate",basename)
+    
+
+    if isnothing(mat)
+        @warn "No match to PauliX or HGate, update search criteria, setting gate to empty string"
+        gate = ""
+    elseif mat.match == "PauliX"
+        gate = "Pauli X"
+    elseif mat.match == "HGate"
+        gate = "Hadamard"
+    elseif mat.match == "HCZGate"
+        gate = "Hadamard Each + CZ"
+    else
+        @warn "No match to PauliX or HGate, update search criteria, setting gate to empty string"
+        gate = ""
+    end
+
+    f=Figure()
+    ax=Axis(f[1,1],xlabel=L"|\psi\rangle",ylabel = L"P(|\psi\rangle)",xticks = (x_axis, enum_comp_basis))
+    barplot!(ax,x_axis,probs,width=0.5,label=gate)
+    ylims!(0,1)
+    axislegend(leg_lab,position=:lt)
+    return f
+end
