@@ -39,3 +39,7 @@ df = @chain data_path begin
     @rtransform :probs = :prob_df.probabilities
     @rtransform :plots = plot_probability_barplot(:x_axis,:probs,:enum_comp_basis,:noise_prob,:basename)    
 end
+
+df |> names
+
+df.basename[1]
