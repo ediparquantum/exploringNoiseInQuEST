@@ -90,6 +90,24 @@ function list_qubit_axis_arrangement(N::Int)
 end
 
 
+"""
+    get_noise_prob(text)
+
+The `get_noise_prob` function extracts the noise probability from the given `text` using a regular expression pattern. It searches for a decimal number with or without a fractional part and returns the matched string.
+
+# Arguments
+- `text::AbstractString`: The input text from which to extract the noise probability.
+
+# Returns
+- `noise_prob::Union{AbstractString, Nothing}`: The extracted noise probability if found, or `nothing` if not found.
+
+# Example
+```julia
+text = "prob-0.1.csv"
+noise_prob = get_noise_prob(text)
+# Output: "0.1"
+
+"""
 function get_noise_prob(text)
     pattern = r"\d+(\.\d+)?"
     m = match(pattern, text)
@@ -135,35 +153,219 @@ basename = "prob-0.10.csv"
 
 plot_probability_barplot(x_axis, probs, enum_comp_basis, noise_prob, basename)
 """
-function plot_probability_barplot(x_axis,probs,enum_comp_basis,noise_prob,basename)
+function plot_probability_barplot(x_axis,probs,enum_comp_basis,noise_prob,gate_label,noise_label)
     
-    if contains(basename,r"damping")
-        leg_lab = "Circuit probabilities\nDamping, p=$(noise_prob)"
+    if noise_label != "Noiseless"
+        leg_lab = "Circuit probabilities\n$(noise_label), p=$(noise_prob)"
     else
         leg_lab = "Circuit probabilities"
     end
 
-    mat = match(r"PauliX|HGate|HCZGate",basename)
-    
-
-    if isnothing(mat)
-        @warn "No match to PauliX or HGate, update search criteria, setting gate to empty string"
-        gate = ""
-    elseif mat.match == "PauliX"
-        gate = "Pauli X"
-    elseif mat.match == "HGate"
-        gate = "Hadamard"
-    elseif mat.match == "HCZGate"
-        gate = "Hadamard Each + CZ"
-    else
-        @warn "No match to PauliX or HGate, update search criteria, setting gate to empty string"
-        gate = ""
-    end
 
     f=Figure()
     ax=Axis(f[1,1],xlabel=L"|\psi\rangle",ylabel = L"P(|\psi\rangle)",xticks = (x_axis, enum_comp_basis))
-    barplot!(ax,x_axis,probs,width=0.5,label=gate)
+    barplot!(ax,x_axis,probs,width=0.5,label=gate_label)
     ylims!(0,1)
     axislegend(leg_lab,position=:lt)
     return f
+end
+
+
+
+
+
+"""
+    rjoin_or(text::Vector)
+
+Converts an array of strings into a regular expression pattern separated by the OR operator ("|").
+
+## Arguments
+- `text::Vector`: An array of strings.
+
+## Returns
+A `Regex` object representing the regular expression pattern.
+
+## Examples
+```julia
+data_sub_folders = ["damping", "no_noise"]
+regex_expression = rjoin_or(data_sub_folders)
+"""
+function rjoin_or(text::Vector)
+    return join(text, "|") |> Regex
+end
+
+
+"""
+    whitespace_removal(text::String)
+
+Remove all whitespace characters from the given text.
+
+# Arguments
+- `text::String`: The input text to remove whitespace from.
+
+# Returns
+- The input text with all whitespace characters removed.
+
+# Examples
+```julia
+julia> whitespace_removal("  Hello    World  ")
+"HelloWorld"
+
+julia> whitespace_removal("   This   is   a   sentence.   ")
+"Thisisasentence."
+
+"""
+function whitespace_removal(text::String)
+    text = replace(text," "=>"")
+    return text
+end
+
+
+
+
+"""
+    make_camel_case(text::String)
+
+Convert the input text to camel case format.
+
+# Arguments
+- `text::String`: The input text to convert to camel case.
+
+# Returns
+- The input text converted to camel case format.
+
+# Examples
+```julia
+julia> make_camel_case("hello world")
+"HelloWorld"
+
+julia> make_camel_case("this is a sentence")
+"ThisIsASentence"
+
+"""
+function make_camel_case(text::String)
+    return text |> titlecase |> whitespace_removal
+end
+
+
+
+    
+
+
+"""
+    unmake_camel_case(text)
+
+Converts a camel case string to a space-separated string.
+
+# Arguments
+- `text::String`: The input string in camel case format.
+
+# Returns
+- `result::String`: The converted string with spaces separating words.
+
+# Examples
+```julia
+julia> unmake_camel_case("helloWorld")
+"hello World"
+
+julia> unmake_camel_case("thisIsATest")
+"this Is A Test"
+
+"""
+function unmake_camel_case(text)
+    isempty(text) && return ""
+    
+    result = string(text[1])  # Add the first character as-is
+    ltext = 2:length(text)
+    for i in ltext
+        if isuppercase(text[i]) && !isuppercase(text[i-1])
+            result *= " "
+        end
+        result *= string(text[i])
+    end
+    
+    return result
+end
+
+
+"""
+    get_label(data_sub_regex, basename, no_match_return)
+
+Extracts a label from a string using a regular expression.
+
+# Arguments
+- `data_sub_regex::Regex`: The regular expression pattern to match against the `basename`.
+- `basename::String`: The input string from which the label will be extracted.
+- `no_match_return::String`: The value to return if no match is found.
+
+# Returns
+- `label::String`: The extracted label.
+
+# Examples
+```julia
+julia> get_label(r"damping|no_noise", "damping_data.csv", "Unknown")
+"Damping Data"
+
+julia> get_label(r"damping|no_noise", "unknown_data.csv", "Unknown")
+"Unknown"
+
+"""
+function get_label(data_sub_regex,basename,no_match_return) 
+    mat = match(data_sub_regex,basename)
+    
+    if isnothing(mat)
+        @warn "No match found returning user input $(no_match_return)"
+        return no_match_return
+    else
+        return unmake_camel_case(mat.match) |> titlecase
+    end
+end
+
+
+
+
+function get_plot_save_path(basename_data_path)
+    if contains(basename_data_path,r"damping")
+        folder = "damping"
+        text = replace(basename_data_path,"csv"=>"png")
+    else
+        folder = "no_noise"
+        text = replace(basename_data_path,"csv"=>"png")
+    end
+    path = string("/",folder,"/",text)
+    return path
+end
+
+
+
+
+
+
+
+"""
+    save_plot_verify(plot_str, plot)
+
+The `save_plot_verify` function saves a plot to a file specified by `plot_str` and verifies the successful saving of the plot. It checks if the file exists using the `isfile` function and returns an appropriate message indicating the status.
+
+# Arguments
+- `plot_str::AbstractString`: The file path to save the plot.
+- `plot::Plots.Plot`: The plot object to be saved.
+
+# Returns
+- `status::String`: The status message indicating the success or failure of the plot saving.
+
+# Example
+```julia
+plot_str = "plot.png"
+plot = plot(x, y)
+status = save_plot_verify(plot_str, plot)
+# Output: "Plot successfully saved to path"
+"""
+function save_plot_verify(plot_str,plot)
+    save(plot_str,plot)
+    if isfile(plot_str) 
+        return "Plot successfully save to path"
+    else
+        @error "Plot did not save to file as the file was not found using `isfile`"
+    end
 end
